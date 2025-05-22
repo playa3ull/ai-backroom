@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatroom</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-header text-center">
+                <h2>AI Chatroom</h2>
+                <p class="mb-0">Create a discussion space for multiple AI agents</p>
+            </div>
+            <div class="card-body">
+                <form id="chatroomForm">
+                    <div class="mb-4">
+                        <h4>Topic</h4>
+                        <div class="mb-3">
+                            <label for="topicTitle" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="topicTitle" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h4>AI Agents</h4>
+                        <div id="agentsList">
+                            <!-- Agent entries will be added here -->
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary mt-2" id="addAgentBtn">
+                            <i class="bi bi-plus-circle"></i> Add Agent
+                        </button>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="maxTurns" class="form-label">Maximum Discussion Turns</label>
+                        <input type="number" class="form-control" id="maxTurns" min="1" max="20" value="10">
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">Create Chatroom</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Template (Hidden) -->
+    <template id="agentTemplate">
+        <div class="agent-row">
+            <div class="row">
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-control agent-name" required>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">Model</label>
+                    <select class="form-select agent-model" required>
+                        <option value="gpt-4o-mini">GPT-4o-mini</option>
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="form-label">Role</label>
+                    <input type="text" class="form-control agent-role" required>
+                </div>
+                <div class="col-md-1 d-flex align-items-end mb-2">
+                    <span class="remove-agent">❌</span>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const agentsList = document.getElementById('agentsList');
+            const addAgentBtn = document.getElementById('addAgentBtn');
+            const agentTemplate = document.getElementById('agentTemplate');
+            const chatroomForm = document.getElementById('chatroomForm');
+            
+            // Add initial agents
+            addAgent();
+            addAgent();
+            
+            // Add agent button click handler
+            addAgentBtn.addEventListener('click', addAgent);
+            
+            // Form submission
+            chatroomForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                createChatroom();
+            });
+            
+            function addAgent() {
+                const agentNode = agentTemplate.content.cloneNode(true);
+                const removeBtn = agentNode.querySelector('.remove-agent');
+                
+                removeBtn.addEventListener('click', function() {
+                    if (agentsList.children.length > 2) {
+                        this.closest('.agent-row').remove();
+                    } else {
+                        alert('At least 2 agents are required for a discussion.');
+                    }
+                });
+                
+                agentsList.appendChild(agentNode);
+            }
+            
+            function createChatroom() {
+                const topicTitle = document.getElementById('topicTitle').value;
+                const maxTurns = document.getElementById('maxTurns').value;
+                
+                // Collect agent data
+                const agents = [];
+                const agentRows = document.querySelectorAll('.agent-row');
+                
+                agentRows.forEach(row => {
+                    agents.push({
+                        name: row.querySelector('.agent-name').value,
+                        model_type: row.querySelector('.agent-model').value,
+                        role: row.querySelector('.agent-role').value
+                    });
+                });
+                
+                // Create chatroom configuration
+                const chatroomConfig = {
+                    topic: {
+                        title: topicTitle
+                    },
+                    agents: agents,
+                    max_turns: parseInt(maxTurns)
+                };
+                
+                // Send request to create chatroom
+                fetch('/api/chatroom/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(chatroomConfig)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else {
+                        window.location.href = '/chatroom/' + data.chatroom_id;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while creating the chatroom.');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

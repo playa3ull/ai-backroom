@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatroom Discussion</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+        .timestamp {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        .status-bar {
+            background-color: #f8f9fa;
+            border-radius: 0 0 15px 15px;
+            padding: 15px;
+            font-size: 0.9rem;
+        }
+        .btn-primary {
+            background-color: #6c5ce7;
+            border-color: #6c5ce7;
+        }
+        .btn-primary:hover {
+            background-color: #5b4bc4;
+            border-color: #5b4bc4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 id="topic-title">Loading discussion...</h2>
+                    <a href="/" class="btn btn-outline-light">Back to Home</a>
+                </div>
+                <p id="topic-description" class="mb-0"></p>
+            </div>
+            
+            <div class="message-container" id="messageContainer">
+                <!-- Messages will be displayed here -->
+                <div class="text-center p-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3">Loading discussion...</p>
+                </div>
+            </div>
+            
+            <div class="status-bar">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span id="turn-counter">Turn: 0/0</span>
+                    </div>
+                    <div>
+                        <button id="startBtn" class="btn btn-primary btn-sm">Start Discussion</button>
+                        <button id="refreshBtn" class="btn btn-outline-secondary btn-sm ms-2">Refresh</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h4>Participating Agents</h4>
+            </div>
+            <div class="card-body">
+                <div id="agentsList" class="row">
+                    <!-- Agent info will be displayed here -->
+                    <p>Loading agents information...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatroomId = '{{ chatroom_id }}';
+            const messageContainer = document.getElementById('messageContainer');
+            const topicTitle = document.getElementById('topic-title');
+            const topicDescription = document.getElementById('topic-description');
+            const turnCounter = document.getElementById('turn-counter');
+            const agentsList = document.getElementById('agentsList');
+            const startBtn = document.getElementById('startBtn');
+            const refreshBtn = document.getElementById('refreshBtn');
+            
+            // Load chatroom data
+            loadChatroomData();
+            
+            // Set up refresh interval
+            let refreshInterval = setInterval(loadChatroomData, 5000);
+            
+            // Button event handlers
+            startBtn.addEventListener('click', startDiscussion);
+            refreshBtn.addEventListener('click', loadChatroomData);
+            
+            function loadChatroomData() {
+                fetch(`/api/chatroom/${chatroomId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Chatroom not found');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        updateChatroomUI(data);
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        messageContainer.innerHTML = `
+                            <div class="alert alert-danger">
+                                Error: ${error.message}
+                            </div>
+                        `;
+                    });
+            }
+            
+            function updateChatroomUI(data) {
+                const config = data.config;
+                const messages = data.messages;
+                const currentTurn = data.current_turn;
+                const maxTurns = config.max_turns;
+                
+                // Update topic information
+                topicTitle.textContent = config.topic.title;
+                topicDescription.textContent = config.topic.description;
+                
+                // Update turn counter
+                turnCounter.textContent = `Turn: ${currentTurn}/${maxTurns}`;
+                
+                // Update agents list
+                updateAgentsList(config.agents);
+                
+                // Update messages
+                updateMessages(messages);
+                
+                // Update start button state
+                if (messages.length > 0) {
+                    startBtn.disabled = true;
+                    startBtn.textContent = 'Discussion Started';
+                }
+            }
+            
+            function updateAgentsList(agents) {
+                agentsList.innerHTML = '';
+                
+                agents.forEach(agent => {
+                    const agentCard = document.createElement('div');
+                    agentCard.className = 'col-md-4 mb-3';
+                    agentCard.innerHTML = `
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">${agent.name}</h5>
+                                <p class="card-text"><strong>Model:</strong> ${agent.model_type}</p>
+                                <p class="card-text"><strong>Role:</strong> ${agent.role}</p>
+                            </div>
+                        </div>
+                    `;
+                    agentsList.appendChild(agentCard);
+                });
+            }
+            
+            function updateMessages(messages) {
+                if (messages.length === 0) {
+                    messageContainer.innerHTML = `
+                        <div class="text-center p-5">
+                            <p>No messages yet. Start the discussion to begin.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                messageContainer.innerHTML = '';
+                
+                messages.forEach(message => {
+                    const messageDiv = document.createElement('div');
+                    const isSystem = message.agent_name === 'System';
+                    messageDiv.className = `message ${isSystem ? 'message-system' : 'message-agent'}`;
+                    
+                    let formattedTime = '';
+                    if (message.timestamp) {
+                        const date = new Date(message.timestamp);
+                        formattedTime = date.toLocaleTimeString();
+                    }
+                    
+                    messageDiv.innerHTML = `
+                        <div class="agent-name">${message.agent_name}</div>
+                        <div class="message-content">${formatMessageContent(message.content)}</div>
+                        <div class="timestamp">${formattedTime}</div>
+                    `;
+                    
+                    messageContainer.appendChild(messageDiv);
+                });
+                
+                // Scroll to bottom
+                messageContainer.scrollTop = messageContainer.scrollHeight;
+            }
+            
+            function formatMessageContent(content) {
+                // Convert line breaks to <br>
+                return content.replace(/\n/g, '<br>');
+            }
+            
+            function startDiscussion() {
+                startBtn.disabled = true;
+                startBtn.innerHTML = `
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Starting...
+                `;
+                
+                fetch(`/api/chatroom/${chatroomId}/start`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Discussion started:', data);
+                    loadChatroomData(); // Refresh immediately
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Start Discussion';
+                    alert('Failed to start discussion. Please try again.');
+                });
+            }
+        });
+    </script>
+</body>
+</html>
