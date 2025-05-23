@@ -3,73 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chatroom Discussion</title>
+    <title>AI Discussion</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        body {
+            background-color: var(--card-bg);
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            height: 100vh;
+            background-color: var(--bg-color);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .sidebar-content {
+            padding: 16px;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin-left: 260px; /* Match sidebar width */
+            width: calc(100% - 260px);
+        }
+        
+        .chat-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .topic-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        /* Message Container */
+        .message-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            scroll-behavior: smooth;
+            height: calc(100vh - 120px); /* Subtract header and footer height */
+        }
+        
+        .message-group {
+            padding: 16px 15%;
+            position: relative;
+        }
+        
+        .message {
+            padding: 0;
+            line-height: 1.5;
+        }
+        
+        .message-system {
+            background-color: var(--system-message-bg);
+            padding: 16px 15%;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            color: var(--muted-text);
+            font-style: italic;
+        }
+        
+        .agent-name {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--primary-color);
+        }
+        
         .timestamp {
-            font-size: 0.8rem;
-            color: #6c757d;
+            font-size: 0.75rem;
+            color: var(--light-text);
+            margin-top: 8px;
+            text-align: right;
         }
-        .status-bar {
-            background-color: #f8f9fa;
-            border-radius: 0 0 15px 15px;
-            padding: 15px;
-            font-size: 0.9rem;
+        
+        /* Footer */
+        .chat-footer {
+            padding: 16px 15%;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .btn-primary {
-            background-color: #6c5ce7;
-            border-color: #6c5ce7;
+        
+        /* Participants */
+        .participant {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            background-color: var(--card-bg);
         }
-        .btn-primary:hover {
-            background-color: #5b4bc4;
-            border-color: #5b4bc4;
+        
+        .participant-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .participant-role {
+            font-size: 12px;
+            color: var(--muted-text);
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--muted-text);
+        }
+        
+        /* Streaming effect */
+        @keyframes blink {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+        
+        .typing-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            margin-left: 5px;
+            animation: blink 1s infinite;
+        }
+        
+        /* Fade in animation for new messages */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 220px;
+            }
+            
+            .main-content {
+                margin-left: 220px;
+                width: calc(100% - 220px);
+            }
+            
+            .message-group {
+                padding: 16px 8%;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 200px;
+                position: relative;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+                height: calc(100vh - 200px);
+            }
+            
+            .message-group {
+                padding: 16px 5%;
+            }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h2 id="topic-title">Loading discussion...</h2>
-                    <a href="/" class="btn btn-outline-light">Back to Home</a>
-                </div>
-                <p id="topic-description" class="mb-0"></p>
-            </div>
-            
-            <div class="message-container" id="messageContainer">
-                <!-- Messages will be displayed here -->
-                <div class="text-center p-5">
-                    <div class="spinner-border text-primary" role="status">
+<body class="chat-page">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">AI Discussion</div>
+        </div>
+        
+        <div class="sidebar-content">
+            <div class="section-title">PARTICIPANTS</div>
+            <div id="agentsList">
+                <!-- Participants will be listed here -->
+                <div class="text-center py-2">
+                    <div class="spinner-border spinner-border-sm text-secondary" role="status">
                         <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-3">Loading discussion...</p>
-                </div>
-            </div>
-            
-            <div class="status-bar">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <span id="turn-counter">Turn: 0/0</span>
-                    </div>
-                    <div>
-                        <button id="startBtn" class="btn btn-primary btn-sm">Start Discussion</button>
-                        <button id="refreshBtn" class="btn btn-outline-secondary btn-sm ms-2">Refresh</button>
                     </div>
                 </div>
             </div>
         </div>
         
-        <div class="card">
-            <div class="card-header">
-                <h4>Participating Agents</h4>
+        <div class="sidebar-footer">
+            <div class="d-grid">
+                <a href="/" class="btn btn-outline-secondary btn-sm">Back to Home</a>
             </div>
-            <div class="card-body">
-                <div id="agentsList" class="row">
-                    <!-- Agent info will be displayed here -->
-                    <p>Loading agents information...</p>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="chat-header">
+            <div class="topic-title" id="topic-title">Loading...</div>
+            <span id="turn-counter" class="text-muted">Turn: 0/0</span>
+        </div>
+        
+        <div class="message-container" id="messageContainer">
+            <!-- Messages will be displayed here -->
+            <div class="text-center p-5">
+                <div class="spinner-border text-secondary" role="status">
+                    <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
+        </div>
+        
+        <div class="chat-footer">
+            <button id="refreshBtn" class="btn btn-outline-secondary btn-sm">Refresh</button>
+            <button id="startBtn" class="btn btn-primary">Start Discussion</button>
         </div>
     </div>
 
@@ -78,11 +267,13 @@
             const chatroomId = '{{ chatroom_id }}';
             const messageContainer = document.getElementById('messageContainer');
             const topicTitle = document.getElementById('topic-title');
-            const topicDescription = document.getElementById('topic-description');
             const turnCounter = document.getElementById('turn-counter');
             const agentsList = document.getElementById('agentsList');
             const startBtn = document.getElementById('startBtn');
             const refreshBtn = document.getElementById('refreshBtn');
+            
+            // Track messages to avoid duplicates
+            let messageIds = new Set();
             
             // Load chatroom data
             loadChatroomData();
@@ -108,8 +299,8 @@
                     .catch(error => {
                         console.error('Error:', error);
                         messageContainer.innerHTML = `
-                            <div class="alert alert-danger">
-                                Error: ${error.message}
+                            <div class="message-group message-system">
+                                <div class="message-content">Error: ${error.message}</div>
                             </div>
                         `;
                     });
@@ -123,7 +314,6 @@
                 
                 // Update topic information
                 topicTitle.textContent = config.topic.title;
-                topicDescription.textContent = config.topic.description;
                 
                 // Update turn counter
                 turnCounter.textContent = `Turn: ${currentTurn}/${maxTurns}`;
@@ -145,54 +335,123 @@
                 agentsList.innerHTML = '';
                 
                 agents.forEach(agent => {
-                    const agentCard = document.createElement('div');
-                    agentCard.className = 'col-md-4 mb-3';
-                    agentCard.innerHTML = `
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <h5 class="card-title">${agent.name}</h5>
-                                <p class="card-text"><strong>Model:</strong> ${agent.model_type}</p>
-                                <p class="card-text"><strong>Role:</strong> ${agent.role}</p>
-                            </div>
-                        </div>
+                    const participantDiv = document.createElement('div');
+                    participantDiv.className = 'participant fade-in';
+                    participantDiv.innerHTML = `
+                        <div class="participant-name">${agent.name}</div>
+                        <div class="participant-role">${agent.role}</div>
                     `;
-                    agentsList.appendChild(agentCard);
+                    agentsList.appendChild(participantDiv);
                 });
             }
             
             function updateMessages(messages) {
                 if (messages.length === 0) {
                     messageContainer.innerHTML = `
-                        <div class="text-center p-5">
-                            <p>No messages yet. Start the discussion to begin.</p>
+                        <div class="message-group message-system">
+                            <div class="message-content">No messages yet. Start the discussion to begin.</div>
                         </div>
                     `;
                     return;
                 }
                 
-                messageContainer.innerHTML = '';
+                // Store current scroll position
+                const scrollPosition = messageContainer.scrollTop;
+                const isAtBottom = isScrolledToBottom();
+                
+                // Only clear and rebuild if this is the first load
+                if (messageContainer.querySelector('.spinner-border') || messageContainer.children.length === 0) {
+                    messageContainer.innerHTML = '';
+                }
+                
+                // Add new messages
+                let hasNewMessages = false;
                 
                 messages.forEach(message => {
-                    const messageDiv = document.createElement('div');
-                    const isSystem = message.agent_name === 'System';
-                    messageDiv.className = `message ${isSystem ? 'message-system' : 'message-agent'}`;
+                    // Create a unique ID for the message
+                    const messageId = `${message.agent_name}-${message.timestamp}`;
                     
-                    let formattedTime = '';
-                    if (message.timestamp) {
-                        const date = new Date(message.timestamp);
-                        formattedTime = date.toLocaleTimeString();
+                    // Skip if we've already added this message
+                    if (messageIds.has(messageId)) {
+                        return;
                     }
                     
-                    messageDiv.innerHTML = `
-                        <div class="agent-name">${message.agent_name}</div>
-                        <div class="message-content">${formatMessageContent(message.content)}</div>
-                        <div class="timestamp">${formattedTime}</div>
-                    `;
+                    hasNewMessages = true;
+                    messageIds.add(messageId);
                     
-                    messageContainer.appendChild(messageDiv);
+                    const isSystem = message.agent_name === 'System';
+                    
+                    if (isSystem) {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'message-group message-system';
+                        
+                        let formattedTime = '';
+                        if (message.timestamp) {
+                            const date = new Date(message.timestamp);
+                            formattedTime = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        }
+                        
+                        messageDiv.innerHTML = `
+                            <div class="message-content">${formatMessageContent(message.content)}</div>
+                            <div class="timestamp">${formattedTime}</div>
+                        `;
+                        
+                        messageContainer.appendChild(messageDiv);
+                    } else {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'message-group fade-in';
+                        
+                        let formattedTime = '';
+                        if (message.timestamp) {
+                            const date = new Date(message.timestamp);
+                            formattedTime = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        }
+                        
+                        messageDiv.innerHTML = `
+                            <div class="message">
+                                <div class="agent-name">${message.agent_name}</div>
+                                <div class="message-content">${formatMessageContent(message.content)}</div>
+                                <div class="timestamp">${formattedTime}</div>
+                            </div>
+                        `;
+                        
+                        messageContainer.appendChild(messageDiv);
+                        
+                        // Simulate typing effect for the newest message
+                        if (messages[messages.length - 1] === message) {
+                            simulateTypingEffect(messageDiv);
+                        }
+                    }
                 });
                 
-                // Scroll to bottom
+                // Only scroll to bottom if user was already at the bottom or we have new messages
+                if (isAtBottom || hasNewMessages) {
+                    scrollToBottom();
+                } else {
+                    messageContainer.scrollTop = scrollPosition;
+                }
+            }
+            
+            function simulateTypingEffect(messageDiv) {
+                // This is just visual - in a real app you'd stream the actual text
+                const typingIndicator = document.createElement('span');
+                typingIndicator.className = 'typing-indicator';
+                messageDiv.querySelector('.message-content').appendChild(typingIndicator);
+                
+                // Remove the indicator after a few seconds
+                setTimeout(() => {
+                    if (typingIndicator.parentNode) {
+                        typingIndicator.parentNode.removeChild(typingIndicator);
+                    }
+                }, 3000);
+            }
+            
+            function isScrolledToBottom() {
+                const threshold = 30; // pixels from bottom
+                return messageContainer.scrollHeight - messageContainer.scrollTop - messageContainer.clientHeight < threshold;
+            }
+            
+            function scrollToBottom() {
                 messageContainer.scrollTop = messageContainer.scrollHeight;
             }
             

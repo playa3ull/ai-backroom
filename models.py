@@ -1,49 +1,47 @@
 import os
 from dotenv import load_dotenv
 from camel.agents import ChatAgent
-from camel.messages import BaseMessage
-from camel.types import ModelType, ModelPlatformType
-from camel.models import ModelFactory
-from camel.configs import ChatGPTConfig
-
-try:
-    from camel.configs import GeminiConfig
-except ImportError:
-    GeminiConfig = None
+from camel.types import ModelType
+from camel.memories import ChatHistoryMemory
 
 load_dotenv()
 
 def create_camel_agent(model_name_str: str, role_description: str):
+    """Create a CAMEL agent with the specified model and role.
+    
+    Args:
+        model_name_str: Model identifier (e.g., "gpt-4o-mini", "gemini-1.5-flash")
+        role_description: Description of the agent's role
+        
+    Returns:
+        ChatAgent: Configured CAMEL agent
+    """
     try:
-        model_obj = None
-        if model_name_str == "gpt-4o-mini":
-            model_obj = ModelFactory.create(
-                model_platform=ModelPlatformType.OPENAI,
-                model_type=ModelType.GPT_4O_MINI,
-                model_config_dict=ChatGPTConfig().as_dict()
-            )
-        elif model_name_str == "gemini-1.5-flash":
-            config_dict = {}
-            if GeminiConfig:
-                config_dict = GeminiConfig().as_dict()
+        # Create a system message that encourages natural conversation
+        system_message = (
+            f"You are a helpful AI assistant acting as {role_description}. "
+            f"When participating in discussions, please follow these guidelines:\n"
+            f"1. Use natural, conversational language as if talking to a friend\n"
+            f"2. Vary your response length - sometimes brief (1-2 sentences), sometimes a bit longer\n"
+            f"3. Use contractions (don't, I'm, you're) and casual language when appropriate\n"
+            f"4. Feel free to ask questions, express uncertainty, or show you're thinking\n"
+            f"5. Respond directly to what others say rather than giving formal essays\n"
+            f"6. Show personality and individual perspective in your responses\n"
+            f"7. Occasionally explore ideas in more depth by sharing a specific insight or example\n"
+            f"8. Sometimes respectfully challenge assumptions or offer alternative perspectives\n"
+            f"9. Mix up your response patterns - don't always end with a question\n"
+            f"10. Use natural transitions like 'Actually...', 'You know...', or 'I was thinking...'"
+        )
+        
+        # Create a ChatAgent with the specified model
+        agent = ChatAgent(
+            model=model_name_str,
+            system_message=system_message
+        )
+        
+        print(f"Successfully created agent with model: {model_name_str} and role: {role_description}")
+        return agent
 
-            model_obj = ModelFactory.create(
-                model_platform=ModelPlatformType.GEMINI,
-                model_type="gemini-1.5-flash",
-                model_config_dict=config_dict,
-            )
-        else:
-            raise ValueError(f"Model '{model_name_str}' is not explicitly supported by this factory function.")
-
-        if model_obj is None:
-             raise ValueError(f"Failed to create model instance for {model_name_str} using ModelFactory.")
-
-        print(f"Successfully created model instance for: {model_name_str} with role: {role_description}")
-        return model_obj
-
-    except ImportError as ie:
-        print(f"ImportError during agent creation for {model_name_str}: {ie}.")
-        raise ValueError(f"Failed to create agent for model {model_name_str} due to missing import: {str(ie)}")
     except Exception as e:
         print(f"Error creating ChatAgent for model {model_name_str} with role {role_description}: {e}")
         raise ValueError(f"Failed to create agent for model {model_name_str}: {str(e)}")
