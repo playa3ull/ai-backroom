@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Discussion</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <style>
         body {
@@ -86,6 +87,7 @@
             height: calc(100vh - 120px); /* Subtract header and footer height */
         }
         
+        /* Message styling */
         .message-group {
             padding: 16px 15%;
             position: relative;
@@ -105,10 +107,17 @@
             font-style: italic;
         }
         
+        /* Agent name colors */
+        .name-color-0 { color: rgb(16, 163, 127); }
+        .name-color-1 { color: rgb(100, 116, 228); }
+        .name-color-2 { color: rgb(246, 124, 96); }
+        .name-color-3 { color: rgb(86, 178, 212); }
+        .name-color-4 { color: rgb(222, 165, 75); }
+        .name-color-5 { color: rgb(172, 122, 226); }
+        
         .agent-name {
             font-weight: 600;
             margin-bottom: 8px;
-            color: var(--primary-color);
         }
         
         .timestamp {
@@ -118,12 +127,12 @@
             text-align: right;
         }
         
-        /* Footer */
+        /* Chat footer */
         .chat-footer {
             padding: 16px 15%;
             border-top: 1px solid var(--border-color);
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: center;
         }
         
@@ -133,6 +142,7 @@
             margin-bottom: 10px;
             border-radius: 6px;
             background-color: var(--card-bg);
+            border-left: 4px solid;
         }
         
         .participant-name {
@@ -176,6 +186,34 @@
         
         .fade-in {
             animation: fadeIn 0.3s ease-in;
+        }
+        
+        /* Border colors for participant list */
+        .border-color-0 { border-left-color: rgb(16, 163, 127); }
+        .border-color-1 { border-left-color: rgb(100, 116, 228); }
+        .border-color-2 { border-left-color: rgb(246, 124, 96); }
+        .border-color-3 { border-left-color: rgb(86, 178, 212); }
+        .border-color-4 { border-left-color: rgb(222, 165, 75); }
+        .border-color-5 { border-left-color: rgb(172, 122, 226); }
+        
+        /* Search tool indicator styling */
+        .search-badge {
+            margin-left: 8px;
+            padding: 3px 8px;
+            font-size: 0.75rem;
+            border-radius: 12px;
+            background-color: #17a2b8;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
         }
         
         /* Responsive adjustments */
@@ -258,7 +296,6 @@
         
         <div class="chat-footer">
             <button id="refreshBtn" class="btn btn-outline-secondary btn-sm">Refresh</button>
-            <button id="startBtn" class="btn btn-primary">Start Discussion</button>
         </div>
     </div>
 
@@ -269,11 +306,14 @@
             const topicTitle = document.getElementById('topic-title');
             const turnCounter = document.getElementById('turn-counter');
             const agentsList = document.getElementById('agentsList');
-            const startBtn = document.getElementById('startBtn');
             const refreshBtn = document.getElementById('refreshBtn');
             
             // Track messages to avoid duplicates
             let messageIds = new Set();
+            
+            // Store agent colors mapping
+            let agentColors = {};
+            let agentOrder = [];
             
             // Load chatroom data
             loadChatroomData();
@@ -282,7 +322,6 @@
             let refreshInterval = setInterval(loadChatroomData, 5000);
             
             // Button event handlers
-            startBtn.addEventListener('click', startDiscussion);
             refreshBtn.addEventListener('click', loadChatroomData);
             
             function loadChatroomData() {
@@ -318,38 +357,48 @@
                 // Update turn counter
                 turnCounter.textContent = `Turn: ${currentTurn}/${maxTurns}`;
                 
-                // Update agents list
+                // Update agents list and assign colors
                 updateAgentsList(config.agents);
                 
                 // Update messages
                 updateMessages(messages);
-                
-                // Update start button state
-                if (messages.length > 0) {
-                    startBtn.disabled = true;
-                    startBtn.textContent = 'Discussion Started';
-                }
             }
             
             function updateAgentsList(agents) {
-                agentsList.innerHTML = '';
-                
-                agents.forEach(agent => {
-                    const participantDiv = document.createElement('div');
-                    participantDiv.className = 'participant fade-in';
-                    participantDiv.innerHTML = `
-                        <div class="participant-name">${agent.name}</div>
-                        <div class="participant-role">${agent.role}</div>
-                    `;
-                    agentsList.appendChild(participantDiv);
-                });
+                if (agentsList.querySelector('.spinner-border')) {
+                    agentsList.innerHTML = '';
+                    
+                    // Assign colors to agents
+                    agents.forEach((agent, index) => {
+                        const colorIndex = index % 6; // We have 6 predefined colors
+                        agentColors[agent.name] = colorIndex;
+                        agentOrder.push(agent.name);
+                        
+                        const participantDiv = document.createElement('div');
+                        participantDiv.className = `participant fade-in border-color-${colorIndex}`;
+                        
+                        // Check if agent has search tool
+                        const searchToolIcon = agent.use_search_tool ? 
+                            `<span class="ms-1 badge bg-light text-dark" title="Has search capability">
+                                <i class="bi bi-search"></i>
+                            </span>` : '';
+                        
+                        participantDiv.innerHTML = `
+                            <div class="participant-name name-color-${colorIndex}">
+                                ${agent.name}${searchToolIcon}
+                            </div>
+                            <div class="participant-role">${agent.role}</div>
+                        `;
+                        agentsList.appendChild(participantDiv);
+                    });
+                }
             }
             
             function updateMessages(messages) {
                 if (messages.length === 0) {
                     messageContainer.innerHTML = `
                         <div class="message-group message-system">
-                            <div class="message-content">No messages yet. Start the discussion to begin.</div>
+                            <div class="message-content">Starting discussion...</div>
                         </div>
                     `;
                     return;
@@ -399,6 +448,8 @@
                         messageContainer.appendChild(messageDiv);
                     } else {
                         const messageDiv = document.createElement('div');
+                        const colorIndex = agentColors[message.agent_name] || 0;
+                        
                         messageDiv.className = 'message-group fade-in';
                         
                         let formattedTime = '';
@@ -407,9 +458,24 @@
                             formattedTime = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                         }
                         
+                        // Check if message contains search results
+                        const hasSearchResults = message.search_used || 
+                            message.content.includes("I searched for") || 
+                            message.content.includes("According to my search") ||
+                            message.content.includes("Based on my search") ||
+                            message.content.includes("search results show");
+                        
+                        // Add search icon if search was used
+                        const searchIcon = hasSearchResults ? 
+                            `<span class="search-badge" title="Search tool was used">
+                                <i class="bi bi-search"></i> Search used
+                            </span>` : '';
+                        
                         messageDiv.innerHTML = `
                             <div class="message">
-                                <div class="agent-name">${message.agent_name}</div>
+                                <div class="agent-name name-color-${colorIndex}">
+                                    ${message.agent_name}${searchIcon}
+                                </div>
                                 <div class="message-content">${formatMessageContent(message.content)}</div>
                                 <div class="timestamp">${formattedTime}</div>
                             </div>
@@ -458,29 +524,6 @@
             function formatMessageContent(content) {
                 // Convert line breaks to <br>
                 return content.replace(/\n/g, '<br>');
-            }
-            
-            function startDiscussion() {
-                startBtn.disabled = true;
-                startBtn.innerHTML = `
-                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    Starting...
-                `;
-                
-                fetch(`/api/chatroom/${chatroomId}/start`, {
-                    method: 'POST'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Discussion started:', data);
-                    loadChatroomData(); // Refresh immediately
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    startBtn.disabled = false;
-                    startBtn.textContent = 'Start Discussion';
-                    alert('Failed to start discussion. Please try again.');
-                });
             }
         });
     </script>

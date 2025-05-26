@@ -10,6 +10,14 @@
   --system-message-bg: #f7f7f8;
   --muted-text: #666;
   --light-text: #999;
+  
+  /* Agent colors - for reference */
+  --agent-color-0: rgb(16, 163, 127);
+  --agent-color-1: rgb(100, 116, 228);
+  --agent-color-2: rgb(246, 124, 96);
+  --agent-color-3: rgb(86, 178, 212);
+  --agent-color-4: rgb(222, 165, 75);
+  --agent-color-5: rgb(172, 122, 226);
 }
 
 /* Base styles */
@@ -119,14 +127,22 @@ h1, h2, h3, h4, h5, h6 {
 .message-group {
   transition: opacity 0.3s ease;
   padding: 16px 15%;
+  position: relative;
 }
 
 .agent-name {
-  color: var(--primary-color);
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 8px;
 }
+
+/* Agent name colors */
+.name-color-0 { color: var(--agent-color-0); }
+.name-color-1 { color: var(--agent-color-1); }
+.name-color-2 { color: var(--agent-color-2); }
+.name-color-3 { color: var(--agent-color-3); }
+.name-color-4 { color: var(--agent-color-4); }
+.name-color-5 { color: var(--agent-color-5); }
 
 .timestamp {
   font-size: 12px;
@@ -153,6 +169,15 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 8px;
   margin-bottom: 16px;
   border: 1px solid var(--border-color);
+}
+
+/* Participant styling */
+.participant {
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  background-color: var(--card-bg);
+  border-left: 4px solid;
 }
 
 /* Animations */
@@ -201,6 +226,14 @@ h1, h2, h3, h4, h5, h6 {
   font-style: italic;
 }
 
+/* Border colors for participant list */
+.border-color-0 { border-left-color: var(--agent-color-0); }
+.border-color-1 { border-left-color: var(--agent-color-1); }
+.border-color-2 { border-left-color: var(--agent-color-2); }
+.border-color-3 { border-left-color: var(--agent-color-3); }
+.border-color-4 { border-left-color: var(--agent-color-4); }
+.border-color-5 { border-left-color: var(--agent-color-5); }
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .sidebar {
@@ -213,7 +246,7 @@ h1, h2, h3, h4, h5, h6 {
   }
   
   .message-group {
-    padding: 16px 5%;
+    padding: 16px 8%;
   }
 }
 
@@ -237,7 +270,7 @@ h1, h2, h3, h4, h5, h6 {
   }
   
   .message-group {
-    padding: 16px;
+    padding: 16px 5%;
   }
 }
 
@@ -248,33 +281,20 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0 15px;
 }
 
-.card {
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  margin-bottom: 20px;
-  border: none;
-}
-
 .card-header {
-  background-color: #fff;
-  padding: 20px;
-  border-bottom: 1px solid #eee;
-  font-weight: 500;
+  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 16px;
 }
 
 .card-body {
-  padding: 20px;
+  padding: 16px;
 }
 
-/* Status Bar */
 .status-bar {
-  background-color: #fff;
-  border-top: 1px solid #eee;
-  padding: 15px 20px;
-  font-size: 0.9rem;
-  color: #555;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding: 8px 16px;
+  background-color: var(--bg-color);
+  border-top: 1px solid var(--border-color);
+  color: var(--muted-text);
+  font-size: 14px;
 }

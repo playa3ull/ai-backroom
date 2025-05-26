@@ -41,6 +41,7 @@ class AgentConfig(BaseModel):
     name: str
     model_type: str
     role: str
+    use_search_tool: bool = False
     
 class ChatroomConfig(BaseModel):
     topic: Topic
@@ -62,9 +63,10 @@ class SimpleDiscussion:
         self.agents = agents
         self.current_agent_idx = 0
         self.conversation_history = []
-        self.message_styles = ["brief", "question", "thoughtful", "challenge", "casual", "deep_dive"]
+        self.message_styles = ["brief", "question", "thoughtful", "challenge", "casual", "deep_dive", "disagree", "counterpoint"]
         self.current_style_idx = 0
         self.turn_count = 0
+        self.last_disagreement = -3  # Track when the last disagreement happened
     
     def get_next_agent_idx(self):
         # Rotate to the next agent
@@ -77,15 +79,24 @@ class SimpleDiscussion:
         # For deeper conversations, use more thoughtful and challenging styles as the discussion progresses
         self.turn_count += 1
         
+        # Increase chance of disagreement as conversation progresses
+        disagreement_threshold = 0.3 if self.turn_count > 3 else 0.1
+        
+        # Force occasional disagreement to make conversation more natural
+        # But don't have disagreements too close to each other
+        if random.random() < disagreement_threshold and (self.turn_count - self.last_disagreement) >= 3:
+            self.last_disagreement = self.turn_count
+            return random.choice(["disagree", "counterpoint"])
+        
         if self.turn_count < 3:
             # Start with simpler styles
             style = random.choice(["brief", "question", "casual"])
         elif self.turn_count < 6:
             # Mid-conversation - mix of styles
-            style = random.choice(["thoughtful", "casual", "question", "deep_dive"])
+            style = random.choice(["thoughtful", "casual", "question", "deep_dive", "challenge"])
         else:
             # Later in conversation - include more depth and challenges
-            style = random.choice(["thoughtful", "challenge", "deep_dive", "casual"])
+            style = random.choice(["thoughtful", "challenge", "deep_dive", "casual", "counterpoint"])
             
         return style
     
@@ -107,6 +118,9 @@ class SimpleDiscussion:
             prompt = f"You are {first_agent['role']}. Start a discussion about: {self.topic} by presenting a slightly provocative or thought-provoking perspective. Be friendly but introduce a point that might spark deeper thinking. Keep it conversational."
         else:  # deep_dive
             prompt = f"You are {first_agent['role']}. Begin a discussion about: {self.topic} by sharing a specific insight or example that illustrates an interesting aspect of the topic. Be conversational but include some substance. Use natural language with contractions."
+        
+        # Add instruction to be authentic and not overly agreeable
+        prompt += "\n\nBe authentic in your perspective. Don't feel the need to be overly agreeable. Express your genuine thoughts, which may include disagreement with common views on this topic."
         
         response = await first_agent["agent"].astep(prompt)
         content = response.msgs[0].content if response.msgs else "I'd like to discuss this topic."
@@ -142,9 +156,33 @@ class SimpleDiscussion:
         elif style == "casual":
             prompt = f"You are {next_agent['role']} in a casual chat about '{self.topic}'. React naturally to what was just said. You might start with phrases like 'Hmm,' 'Yeah,' 'I see what you mean,' etc. Use casual language and contractions. Keep it conversational and not like an essay.\n\nRecent conversation:\n{history_text}"
         elif style == "challenge":
-            prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. Politely challenge or present an alternative perspective to something mentioned in the conversation. Start with agreement before offering your different view. Be friendly and conversational, not argumentative.\n\nRecent conversation:\n{history_text}"
+            prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. Politely challenge or present an alternative perspective to something mentioned in the conversation. Start with acknowledging their point before offering your different view. Be friendly and conversational, not argumentative.\n\nRecent conversation:\n{history_text}"
+        elif style == "disagree":
+            prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. You disagree with something that was just said. Express your disagreement politely but clearly. Don't be afraid to take a different stance. Start with something like 'I'm not sure I agree with that' or 'I actually see it differently'. Be authentic and conversational.\n\nRecent conversation:\n{history_text}"
+        elif style == "counterpoint":
+            prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. Present a counterpoint to what was just said. You can start with a brief acknowledgment but then offer a contrasting perspective or evidence that points in a different direction. Be respectful but don't feel the need to agree. Your perspective is valuable even when it differs.\n\nRecent conversation:\n{history_text}"
         else:  # deep_dive
             prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. Explore one specific point from the conversation in more depth. Share a relevant example, insight, or nuance that adds substance. Remain conversational and use natural language, but go a bit deeper on this particular aspect.\n\nRecent conversation:\n{history_text}"
+        
+        # Add search tool encouragement if the agent has search capability
+        if next_agent.get('use_search_tool', False):
+            # Randomly determine if we should strongly encourage search in this turn
+            should_encourage_search = random.random() < 0.7  # 70% chance
+            
+            if should_encourage_search:
+                search_prompt = (
+                    f"\n\nIMPORTANT: You have access to search tools. For this response, please use your search capability "
+                    f"to find specific information, facts, or recent developments about '{self.topic}' that might not be in your training data. "
+                    f"This will make your contribution more informative and accurate. When you use search, mention that you looked something up "
+                    f"(e.g., 'I searched for this and found...' or 'According to my search...')."
+                )
+            else:
+                search_prompt = (
+                    f"\n\nRemember: You have access to search tools. If you need specific information or facts about '{self.topic}', "
+                    f"please use your search capability rather than making assumptions. This will help ensure accuracy."
+                )
+                
+            prompt += search_prompt
         
         # Add occasional thinking indicators
         if random.random() < 0.3:  # 30% chance
@@ -164,6 +202,9 @@ class SimpleDiscussion:
                 "Express mild agreement or disagreement before sharing your thoughts."
             ]
             prompt += "\n\n" + random.choice(variety_prompts)
+        
+        # Add reminder to be authentic and not overly agreeable
+        prompt += "\n\nRemember to be authentic in your response. Don't feel the need to agree with the previous speaker just to be polite. It's perfectly fine to have a different perspective or opinion. Human conversations are more interesting when there are different viewpoints."
         
         # Get response from the agent
         response = await next_agent["agent"].astep(prompt)
@@ -204,14 +245,16 @@ async def create_chatroom(config: ChatroomConfig):
             # Create agent instance
             agent = create_camel_agent(
                 model_name_str=agent_config.model_type, 
-                role_description=agent_config.role
+                role_description=agent_config.role,
+                use_search_tool=agent_config.use_search_tool
             )
             
             if agent:
                 agents.append({
                     "name": agent_config.name,
                     "role": agent_config.role,
-                    "agent": agent
+                    "agent": agent,
+                    "use_search_tool": agent_config.use_search_tool
                 })
             else:
                 print(f"Warning: Could not create agent instance for {agent_config.name}.")
@@ -232,6 +275,21 @@ async def create_chatroom(config: ChatroomConfig):
         "messages": [],
         "current_turn": 0
     }
+    
+    # Initialize the discussion with the topic
+    topic = config.topic
+    initial_message = f"Let's discuss the topic: {topic.title}"
+    
+    # Add the initial message
+    timestamp = datetime.now().isoformat()
+    active_chatrooms[chatroom_id]["messages"].append({
+        "agent_name": "System",
+        "content": initial_message,
+        "timestamp": timestamp
+    })
+    
+    # Start the discussion asynchronously
+    asyncio.create_task(run_discussion(chatroom_id))
     
     return {"chatroom_id": chatroom_id}
 
@@ -254,6 +312,10 @@ async def start_discussion(chatroom_id: str):
     
     chatroom = active_chatrooms[chatroom_id]
     config = chatroom["config"]
+    
+    # Check if discussion is already started
+    if len(chatroom["messages"]) > 0:
+        return {"status": "Discussion already started"}
     
     # Initialize the discussion with the topic
     topic = config["topic"]
@@ -282,12 +344,22 @@ async def run_discussion(chatroom_id: str):
         # Start the discussion
         first_response = await discussion.start_discussion()
         
+        # Check if search was used in the response
+        search_used = False
+        if hasattr(first_response["agent"]["agent"], "info") and first_response["agent"]["agent"].info:
+            if "tool_calls" in first_response["agent"]["agent"].info and first_response["agent"]["agent"].info["tool_calls"]:
+                for tool_call in first_response["agent"]["agent"].info["tool_calls"]:
+                    if "search" in tool_call.name.lower():
+                        search_used = True
+                        break
+        
         # Add the first message
         timestamp = datetime.now().isoformat()
         chatroom["messages"].append({
             "agent_name": first_response["agent"]["name"],
             "content": first_response["content"],
-            "timestamp": timestamp
+            "timestamp": timestamp,
+            "search_used": search_used
         })
         
         previous_message = first_response["content"]
@@ -300,12 +372,32 @@ async def run_discussion(chatroom_id: str):
             try:
                 response = await discussion.continue_discussion(previous_message)
                 
+                # Check if search was used in the response
+                search_used = False
+                if hasattr(response["agent"]["agent"], "info") and response["agent"]["agent"].info:
+                    if "tool_calls" in response["agent"]["agent"].info and response["agent"]["agent"].info["tool_calls"]:
+                        for tool_call in response["agent"]["agent"].info["tool_calls"]:
+                            if "search" in tool_call.name.lower():
+                                search_used = True
+                                break
+                
+                # Also check content for search indicators
+                content_indicates_search = (
+                    "I searched for" in response["content"] or
+                    "According to my search" in response["content"] or
+                    "Based on my search" in response["content"] or
+                    "search results show" in response["content"]
+                )
+                
+                search_used = search_used or content_indicates_search
+                
                 # Add the message to the chatroom
                 timestamp = datetime.now().isoformat()
                 chatroom["messages"].append({
                     "agent_name": response["agent"]["name"],
                     "content": response["content"],
-                    "timestamp": timestamp
+                    "timestamp": timestamp,
+                    "search_used": search_used
                 })
                 
                 # Update previous message for next turn

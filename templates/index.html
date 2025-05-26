@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Discussion</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <style>
         body {
@@ -147,6 +148,19 @@
                 <input type="number" class="form-control" id="maxTurns" min="1" max="20" value="10">
                 <div class="form-text">Limit how many turns the discussion will last</div>
             </div>
+            
+            <div class="form-section mt-4">
+                <h6 class="mb-2">Available Tools</h6>
+                <div class="card p-3 mb-2">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-search me-2"></i>
+                        <strong>Search Tool</strong>
+                    </div>
+                    <p class="mb-0 small text-muted">
+                        Enable web search capability for agents. When enabled, agents can search the web for information outside their knowledge base.
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -165,9 +179,17 @@
                         <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                     </select>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <label class="form-label">Role</label>
                     <input type="text" class="form-control agent-role" required placeholder="e.g., Digital Rights Theorist AI">
+                </div>
+                <div class="col-md-1">
+                    <div class="form-check mt-4">
+                        <input class="form-check-input agent-search-tool" type="checkbox" value="">
+                        <label class="form-check-label" title="Enable web search capability">
+                            <i class="bi bi-search"></i> Search
+                        </label>
+                    </div>
                 </div>
                 <div class="col-md-1 d-flex align-items-end justify-content-end">
                     <span class="remove-agent">✕</span>
@@ -223,7 +245,8 @@
                     agents.push({
                         name: row.querySelector('.agent-name').value,
                         model_type: row.querySelector('.agent-model').value,
-                        role: row.querySelector('.agent-role').value
+                        role: row.querySelector('.agent-role').value,
+                        use_search_tool: row.querySelector('.agent-search-tool').checked
                     });
                 });
                 
