@@ -175,8 +175,14 @@
                 <div class="col-md-3">
                     <label class="form-label">Model</label>
                     <select class="form-select agent-model" required>
-                        <option value="gpt-4o-mini">GPT-4o-mini</option>
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                        <optgroup label="OpenAI Models">
+                            <option value="gpt-4o-mini">GPT-4o Mini</option>
+                            <option value="gpt-4o">GPT-4o</option>
+                        </optgroup>
+                        <optgroup label="Gemini Models">
+                            <option value="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash Preview</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div class="col-md-5">

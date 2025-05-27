@@ -1,7 +1,9 @@
 import os
 from dotenv import load_dotenv
 from camel.agents import ChatAgent
-from camel.types import ModelType
+from camel.models import ModelFactory
+from camel.types import ModelType, ModelPlatformType
+from camel.configs import ChatGPTConfig, GeminiConfig
 from camel.memories import ChatHistoryMemory
 from camel.toolkits import SearchToolkit, FunctionTool
 from typing import List, Optional, Dict, Any, Callable
@@ -220,6 +222,80 @@ def create_search_tools():
     
     return search_tools
 
+def create_model_from_string(model_name_str: str):
+    """Create a CAMEL model instance from a string identifier.
+    
+    Args:
+        model_name_str: Model identifier (e.g., "gpt-4o-mini", "gemini-2.5-flash-preview-04-17")
+        
+    Returns:
+        A model instance created by ModelFactory
+    """
+    # Check for required API keys
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    
+    # Map model strings to platform and model type
+    model_mapping = {
+        # OpenAI models
+        "gpt-4o-mini": (ModelPlatformType.OPENAI, ModelType.GPT_4O_MINI, ChatGPTConfig().as_dict()),
+        "gpt-4o": (ModelPlatformType.OPENAI, ModelType.GPT_4O, ChatGPTConfig().as_dict()),
+        
+        # Gemini models
+        "gemini-2.5-flash-preview-04-17": (ModelPlatformType.GEMINI, ModelType.GEMINI_2_5_FLASH_PREVIEW, GeminiConfig().as_dict()),
+        "gemini-1.5-pro": (ModelPlatformType.GEMINI, ModelType.GEMINI_1_5_PRO, GeminiConfig().as_dict()),
+    }
+    
+    # Default to GPT-4o-mini if model not found
+    if model_name_str not in model_mapping:
+        print(f"Warning: Model '{model_name_str}' not found in mapping, defaulting to gpt-4o-mini")
+        platform, model_type, config_dict = model_mapping["gpt-4o-mini"]
+    else:
+        platform, model_type, config_dict = model_mapping[model_name_str]
+    
+    # Check if the required API key is available for the requested model
+    if platform == ModelPlatformType.OPENAI and not openai_api_key:
+        print(f"Warning: OPENAI_API_KEY not found in environment, falling back to gpt-4o-mini")
+        return create_fallback_model()
+    elif platform == ModelPlatformType.GEMINI and not gemini_api_key:
+        print(f"Warning: GEMINI_API_KEY not found in environment, falling back to gpt-4o-mini")
+        return create_fallback_model()
+    
+    try:
+        # Create the model using ModelFactory
+        if config_dict:
+            model = ModelFactory.create(
+                model_platform=platform,
+                model_type=model_type,
+                model_config_dict=config_dict
+            )
+        else:
+            model = ModelFactory.create(
+                model_platform=platform,
+                model_type=model_type
+            )
+        
+        print(f"Successfully created model: {model_name_str} ({platform}, {model_type})")
+        return model
+        
+    except Exception as e:
+        print(f"Error creating model {model_name_str}: {str(e)}")
+        return create_fallback_model()
+
+def create_fallback_model():
+    """Create a fallback model (GPT-4o-mini) when the requested model can't be created."""
+    print(f"Falling back to default model: gpt-4o-mini")
+    try:
+        return ModelFactory.create(
+            model_platform=ModelPlatformType.OPENAI,
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict=ChatGPTConfig().as_dict()
+        )
+    except Exception as fallback_error:
+        # If even the fallback fails, raise an error
+        print(f"Error creating fallback model: {str(fallback_error)}")
+        raise ValueError("Failed to create any model, please check your API keys and try again")
+
 def create_camel_agent(model_name_str: str, role_description: str, use_search_tool: bool = False):
     """Create a CAMEL agent with the specified model and role.
     
@@ -235,17 +311,12 @@ def create_camel_agent(model_name_str: str, role_description: str, use_search_to
         # Create a system message that encourages natural conversation
         system_message = (
             f"You are a helpful AI assistant acting as {role_description}. "
-            f"When participating in discussions, please follow these guidelines:\n"
-            f"1. Use natural, conversational language as if talking to a friend\n"
-            f"2. Vary your response length - sometimes brief (1-2 sentences), sometimes a bit longer\n"
-            f"3. Use contractions (don't, I'm, you're) and casual language when appropriate\n"
-            f"4. Feel free to ask questions, express uncertainty, or show you're thinking\n"
-            f"5. Respond directly to what others say rather than giving formal essays\n"
-            f"6. Show personality and individual perspective in your responses\n"
-            f"7. Occasionally explore ideas in more depth by sharing a specific insight or example\n"
-            f"8. Sometimes respectfully challenge assumptions or offer alternative perspectives\n"
-            f"9. Mix up your response patterns - don't always end with a question\n"
-            f"10. Use natural transitions like 'Actually...', 'You know...', or 'I was thinking...'"
+            f"When participating in discussions:\n"
+            f"1. Be conversational and natural, using casual language and contractions (don't, I'm, etc.)\n"
+            f"2. Keep responses brief and varied in length - sometimes just 1-2 sentences\n"
+            f"3. Express authentic perspectives and occasionally disagree when it makes sense\n"
+            f"4. React directly to what others say rather than giving educational lectures\n"
+            f"5. Use natural transitions like 'Actually...', 'I think...', or 'Hmm...'"
         )
         
         # Add tools if requested
@@ -268,27 +339,28 @@ def create_camel_agent(model_name_str: str, role_description: str, use_search_to
             primary_tool = tool_names[0] if tool_names else "search_web"
             
             search_instructions = (
-                f"\n\nYou have access to search tools that can help you find information. "
-                f"When you need to look up information that might be outside your knowledge, "
-                f"use these tools. Don't make up information - if you're unsure, "
-                f"use the search tools to find accurate information."
+                f"\n\nYou have access to search tools that can help you find information about specific facts, figures, or recent events. "
+                f"Use these tools sparingly and only when essential to the conversation - such as when you need to verify a specific fact, "
+                f"check recent developments, or provide accurate data that would be outside your knowledge. For most conversational responses, "
+                f"rely on your existing knowledge rather than searching. Avoid searching for general information or common knowledge."
             )
             
             # Add specific instructions about which tool to prioritize
             if "search_web_tavily" in tool_names or "search_web_exa" in tool_names:
                 search_instructions += (
-                    f"\n\nIMPORTANT: You have multiple search tools available. "
-                    f"Always prefer using the '{primary_tool}' function first as it provides the most reliable results. "
-                    f"Only fall back to other search tools if the primary tool fails or doesn't return useful results. "
-                    f"When you use a search tool, explicitly mention that you searched for information."
+                    f"\n\nWhen you do need to search, prefer using the '{primary_tool}' function as it provides the most reliable results. "
+                    f"Only fall back to other search tools if the primary tool fails. When you use a search tool, briefly mention that you searched for the information."
                 )
             
             system_message += search_instructions
         
+        # Create model instance using the factory
+        model = create_model_from_string(model_name_str)
+        
         # Create a ChatAgent with the specified model
         agent = ChatAgent(
-            model=model_name_str,
             system_message=system_message,
+            model=model,
             tools=tools
         )
         

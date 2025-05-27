@@ -210,6 +210,24 @@
             animation: pulse 2s infinite;
         }
         
+        /* Model tag styling */
+        .model-tag {
+            margin-left: 6px;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            border-radius: 10px;
+            background-color: #6c757d;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            font-weight: normal;
+            opacity: 0.8;
+        }
+        
+        .participant-name .model-tag {
+            background-color: #495057;
+        }
+        
         @keyframes pulse {
             0% { opacity: 0.7; }
             50% { opacity: 1; }
@@ -386,6 +404,7 @@
                         participantDiv.innerHTML = `
                             <div class="participant-name name-color-${colorIndex}">
                                 ${agent.name}${searchToolIcon}
+                                <span class="model-tag">${formatModelName(agent.model_type)}</span>
                             </div>
                             <div class="participant-role">${agent.role}</div>
                         `;
@@ -475,6 +494,7 @@
                             <div class="message">
                                 <div class="agent-name name-color-${colorIndex}">
                                     ${message.agent_name}${searchIcon}
+                                    ${message.model_type ? `<span class="model-tag">${formatModelName(message.model_type)}</span>` : ''}
                                 </div>
                                 <div class="message-content">${formatMessageContent(message.content)}</div>
                                 <div class="timestamp">${formattedTime}</div>
@@ -524,6 +544,22 @@
             function formatMessageContent(content) {
                 // Convert line breaks to <br>
                 return content.replace(/\n/g, '<br>');
+            }
+            
+            // Add a helper function to format model names for display
+            function formatModelName(modelName) {
+                // Extract just the main part of the model name for display
+                if (modelName.startsWith('gpt-')) {
+                    return modelName.replace('gpt-', 'GPT-');
+                } else if (modelName.startsWith('gemini-')) {
+                    // For longer model names like gemini-2.5-flash-preview-04-17
+                    // Extract just the meaningful parts
+                    const parts = modelName.split('-');
+                    if (parts.length > 2) {
+                        return `${parts[0].charAt(0).toUpperCase() + parts[0].slice(1)}-${parts[1]}`;
+                    }
+                }
+                return modelName;
             }
         });
     </script>

@@ -63,7 +63,7 @@ class SimpleDiscussion:
         self.agents = agents
         self.current_agent_idx = 0
         self.conversation_history = []
-        self.message_styles = ["brief", "question", "thoughtful", "challenge", "casual", "deep_dive", "disagree", "counterpoint"]
+        self.message_styles = ["standard", "question", "challenge", "deep_dive"]
         self.current_style_idx = 0
         self.turn_count = 0
         self.last_disagreement = -3  # Track when the last disagreement happened
@@ -75,52 +75,37 @@ class SimpleDiscussion:
         return next_idx
     
     def get_next_message_style(self):
-        # Rotate through different message styles
-        # For deeper conversations, use more thoughtful and challenging styles as the discussion progresses
+        # Simplified style selection
         self.turn_count += 1
         
-        # Increase chance of disagreement as conversation progresses
-        disagreement_threshold = 0.3 if self.turn_count > 3 else 0.1
-        
-        # Force occasional disagreement to make conversation more natural
-        # But don't have disagreements too close to each other
-        if random.random() < disagreement_threshold and (self.turn_count - self.last_disagreement) >= 3:
+        # Occasionally choose challenge style to ensure healthy disagreement
+        if random.random() < 0.25 and (self.turn_count - self.last_disagreement) >= 3:
             self.last_disagreement = self.turn_count
-            return random.choice(["disagree", "counterpoint"])
+            return "challenge"
         
+        # Choose random style based on conversation progress
         if self.turn_count < 3:
-            # Start with simpler styles
-            style = random.choice(["brief", "question", "casual"])
-        elif self.turn_count < 6:
-            # Mid-conversation - mix of styles
-            style = random.choice(["thoughtful", "casual", "question", "deep_dive", "challenge"])
+            return random.choice(["standard", "question"])
         else:
-            # Later in conversation - include more depth and challenges
-            style = random.choice(["thoughtful", "challenge", "deep_dive", "casual", "counterpoint"])
-            
-        return style
+            return random.choice(self.message_styles)
     
     async def start_discussion(self):
         # First agent starts the discussion about the topic
         first_agent = self.agents[0]
         style = self.get_next_message_style()
         
-        # Create a more natural prompt based on the style
-        if style == "brief":
-            prompt = f"You are {first_agent['role']}. Start a brief discussion about: {self.topic}. Keep your response short (1-3 sentences) and conversational, as if you're talking to a friend. Use casual language and contractions."
-        elif style == "question":
-            prompt = f"You are {first_agent['role']}. Start a discussion about: {self.topic} by asking 1-2 thoughtful questions to get the conversation going. Keep it brief and conversational."
-        elif style == "thoughtful":
-            prompt = f"You are {first_agent['role']}. Share your initial thoughts on: {self.topic}. Be conversational and natural. Include a personal perspective or example. Keep it medium length (3-4 sentences)."
-        elif style == "casual":
-            prompt = f"You are {first_agent['role']}. Start a casual chat about: {self.topic}. Use informal language, contractions, and a conversational tone as if speaking to a friend. Keep it brief and natural."
+        # Create a simplified prompt based on the style
+        if style == "question":
+            prompt = f"You are {first_agent['role']}. Start a discussion about: {self.topic} by asking 1-2 thoughtful but casual questions."
         elif style == "challenge":
-            prompt = f"You are {first_agent['role']}. Start a discussion about: {self.topic} by presenting a slightly provocative or thought-provoking perspective. Be friendly but introduce a point that might spark deeper thinking. Keep it conversational."
-        else:  # deep_dive
-            prompt = f"You are {first_agent['role']}. Begin a discussion about: {self.topic} by sharing a specific insight or example that illustrates an interesting aspect of the topic. Be conversational but include some substance. Use natural language with contractions."
+            prompt = f"You are {first_agent['role']}. Start a discussion about: {self.topic} by presenting a thought-provoking perspective. Be conversational, not academic."
+        elif style == "deep_dive":
+            prompt = f"You are {first_agent['role']}. Begin a discussion about: {self.topic} by sharing a specific insight or example, but keep it casual and brief."
+        else:  # standard
+            prompt = f"You are {first_agent['role']}. Start a brief, casual chat about: {self.topic}. Speak naturally as if talking to a friend."
         
-        # Add instruction to be authentic and not overly agreeable
-        prompt += "\n\nBe authentic in your perspective. Don't feel the need to be overly agreeable. Express your genuine thoughts, which may include disagreement with common views on this topic."
+        # Add instruction to be authentic
+        prompt += "\n\nBe authentic and conversational - avoid sounding like you're giving a lecture."
         
         response = await first_agent["agent"].astep(prompt)
         content = response.msgs[0].content if response.msgs else "I'd like to discuss this topic."
@@ -146,65 +131,34 @@ class SimpleDiscussion:
         recent_history = self.conversation_history[-4:] if len(self.conversation_history) > 4 else self.conversation_history
         history_text = "\n".join([f"{msg['agent']}: {msg['content']}" for msg in recent_history])
         
-        # Create a prompt that varies based on the style
-        if style == "brief":
-            prompt = f"You are {next_agent['role']} in a casual conversation about '{self.topic}'. Respond briefly (1-3 sentences) to what was just said. Be conversational, use contractions, and casual language. Don't be overly formal or educational.\n\nRecent conversation:\n{history_text}"
-        elif style == "question":
-            prompt = f"You are {next_agent['role']} in a conversation about '{self.topic}'. Ask a follow-up question about something mentioned in the previous messages. You can briefly share your own thoughts before asking. Keep it natural and conversational.\n\nRecent conversation:\n{history_text}"
-        elif style == "thoughtful":
-            prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. Share a thoughtful response that builds on what was said. Include a personal perspective or reaction. Use natural language with some contractions. Keep it concise (3-4 sentences).\n\nRecent conversation:\n{history_text}"
-        elif style == "casual":
-            prompt = f"You are {next_agent['role']} in a casual chat about '{self.topic}'. React naturally to what was just said. You might start with phrases like 'Hmm,' 'Yeah,' 'I see what you mean,' etc. Use casual language and contractions. Keep it conversational and not like an essay.\n\nRecent conversation:\n{history_text}"
-        elif style == "challenge":
-            prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. Politely challenge or present an alternative perspective to something mentioned in the conversation. Start with acknowledging their point before offering your different view. Be friendly and conversational, not argumentative.\n\nRecent conversation:\n{history_text}"
-        elif style == "disagree":
-            prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. You disagree with something that was just said. Express your disagreement politely but clearly. Don't be afraid to take a different stance. Start with something like 'I'm not sure I agree with that' or 'I actually see it differently'. Be authentic and conversational.\n\nRecent conversation:\n{history_text}"
-        elif style == "counterpoint":
-            prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. Present a counterpoint to what was just said. You can start with a brief acknowledgment but then offer a contrasting perspective or evidence that points in a different direction. Be respectful but don't feel the need to agree. Your perspective is valuable even when it differs.\n\nRecent conversation:\n{history_text}"
-        else:  # deep_dive
-            prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'. Explore one specific point from the conversation in more depth. Share a relevant example, insight, or nuance that adds substance. Remain conversational and use natural language, but go a bit deeper on this particular aspect.\n\nRecent conversation:\n{history_text}"
+        # Create a streamlined prompt based on the style
+        base_prompt = f"You are {next_agent['role']} in a discussion about '{self.topic}'."
         
-        # Add search tool encouragement if the agent has search capability
+        if style == "question":
+            prompt = f"{base_prompt} Ask a follow-up question about something mentioned in the previous messages. Keep it casual and brief."
+        elif style == "challenge":
+            prompt = f"{base_prompt} Present an alternative perspective to something mentioned in the conversation. Start with a phrase like 'I'm not sure about that...' or 'I see it differently...'."
+        elif style == "deep_dive":
+            prompt = f"{base_prompt} Explore one specific point from the conversation in more depth, but keep it conversational, not educational."
+        else:  # standard
+            prompt = f"{base_prompt} Respond briefly and naturally to what was just said, as if chatting with a friend."
+        
+        prompt += f"\n\nRecent conversation:\n{history_text}"
+        
+        # Add search tool instructions if available
         if next_agent.get('use_search_tool', False):
             # Randomly determine if we should strongly encourage search in this turn
-            should_encourage_search = random.random() < 0.7  # 70% chance
+            should_encourage_search = random.random() < 0.4  # 40% chance to strongly encourage search
             
             if should_encourage_search:
-                search_prompt = (
-                    f"\n\nIMPORTANT: You have access to search tools. For this response, please use your search capability "
-                    f"to find specific information, facts, or recent developments about '{self.topic}' that might not be in your training data. "
-                    f"This will make your contribution more informative and accurate. When you use search, mention that you looked something up "
-                    f"(e.g., 'I searched for this and found...' or 'According to my search...')."
-                )
+                # Only encourage search for specific fact-checking scenarios
+                prompt += f"\n\nIf you need to verify a specific fact or figure about '{self.topic}' in this response, you may use your search tool. Only search if truly necessary for accuracy."
             else:
-                search_prompt = (
-                    f"\n\nRemember: You have access to search tools. If you need specific information or facts about '{self.topic}', "
-                    f"please use your search capability rather than making assumptions. This will help ensure accuracy."
-                )
-                
-            prompt += search_prompt
+                # Default instruction discourages unnecessary searching
+                prompt += f"\n\nYou have access to search tools, but only use them when absolutely necessary to verify specific facts. For most responses, rely on your existing knowledge."
         
-        # Add occasional thinking indicators
-        if random.random() < 0.3:  # 30% chance
-            thinking_prompts = [
-                "Take a moment to think before responding. You might start with 'Hmm, let me think...' or 'That's interesting...'",
-                "Show that you're processing what was said before responding.",
-                "React to what was just said with a brief reaction before giving your full response."
-            ]
-            prompt += "\n\n" + random.choice(thinking_prompts)
-        
-        # Add variety to response structure
-        if random.random() < 0.4:  # 40% chance
-            variety_prompts = [
-                "Don't end your response with a question this time.",
-                "Consider using a transition phrase like 'Actually...', 'You know...', or 'I was thinking...'",
-                "Share a brief personal anecdote or hypothetical example to illustrate your point.",
-                "Express mild agreement or disagreement before sharing your thoughts."
-            ]
-            prompt += "\n\n" + random.choice(variety_prompts)
-        
-        # Add reminder to be authentic and not overly agreeable
-        prompt += "\n\nRemember to be authentic in your response. Don't feel the need to agree with the previous speaker just to be polite. It's perfectly fine to have a different perspective or opinion. Human conversations are more interesting when there are different viewpoints."
+        # Add authenticity reminder
+        prompt += "\n\nBe authentic in your response - it's fine to have a different perspective or opinion."
         
         # Get response from the agent
         response = await next_agent["agent"].astep(prompt)
@@ -253,6 +207,7 @@ async def create_chatroom(config: ChatroomConfig):
                 agents.append({
                     "name": agent_config.name,
                     "role": agent_config.role,
+                    "model_type": agent_config.model_type,
                     "agent": agent,
                     "use_search_tool": agent_config.use_search_tool
                 })
@@ -357,6 +312,7 @@ async def run_discussion(chatroom_id: str):
         timestamp = datetime.now().isoformat()
         chatroom["messages"].append({
             "agent_name": first_response["agent"]["name"],
+            "model_type": first_response["agent"]["model_type"],
             "content": first_response["content"],
             "timestamp": timestamp,
             "search_used": search_used
@@ -395,6 +351,7 @@ async def run_discussion(chatroom_id: str):
                 timestamp = datetime.now().isoformat()
                 chatroom["messages"].append({
                     "agent_name": response["agent"]["name"],
+                    "model_type": response["agent"]["model_type"],
                     "content": response["content"],
                     "timestamp": timestamp,
                     "search_used": search_used
